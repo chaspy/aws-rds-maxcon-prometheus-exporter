@@ -16,8 +16,9 @@ import (
 
 type RDSInfo struct {
 	DBInstanceIdentifier string
-	DBParameterGroups []*rds.DBParameterGroupStatus
-	DBInstanceClass string
+	DBParameterGroups    []*rds.DBParameterGroupStatus
+	DBInstanceClass      string
+	MaxConnections       string
 }
 
 var (
@@ -28,7 +29,7 @@ var (
 		Name:      "max_connections",
 		Help:      "MAx Connections of RDS",
 	},
-		[]string{"instance_identifier", "instance_class","max_connections"},
+		[]string{"instance_identifier", "instance_class", "max_connections"},
 	)
 )
 
@@ -67,9 +68,9 @@ func snapshot() error {
 	for _, InstanceInfo := range InstanceInfos {
 		labels := prometheus.Labels{
 			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
-		//	"cluster_identifier":             InstanceInfo.DBParameterGroups,
-			"instance_class":     InstanceInfo.DBInstanceClass,
-		  "max_connections": "3000",
+			//	"cluster_identifier":             InstanceInfo.DBParameterGroups,
+			"instance_class":  InstanceInfo.DBInstanceClass,
+			"max_connections": InstanceInfo.MaxConnections,
 		}
 		maxcon.With(labels).Set(1)
 	}
@@ -93,6 +94,8 @@ func getInterval() (int, error) {
 }
 
 func getRDSInstances() ([]RDSInfo, error) {
+	var rawMaxConnections string
+
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
@@ -104,15 +107,63 @@ func getRDSInstances() ([]RDSInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe DB instances: %w", err)
 	}
-	
+
 	RDSInfos := make([]RDSInfo, len(RDSInstances.DBInstances))
+
 	for i, RDSInstance := range RDSInstances.DBInstances {
+		for _, DBParameterGroup := range RDSInstance.DBParameterGroups {
+			rawMaxConnections, err = getRawMaxConnections(DBParameterGroup.DBParameterGroupName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get Parameter Group: %w", err)
+			}
+		}
+
 		RDSInfos[i] = RDSInfo{
-			DBInstanceIdentifier:  *RDSInstance.DBInstanceIdentifier,
-			DBParameterGroups:  RDSInstance.DBParameterGroups,
-			DBInstanceClass:  *RDSInstance.DBInstanceClass,
+			DBInstanceIdentifier: *RDSInstance.DBInstanceIdentifier,
+			DBParameterGroups:    RDSInstance.DBParameterGroups,
+			DBInstanceClass:      *RDSInstance.DBInstanceClass,
+			MaxConnections:       rawMaxConnections,
 		}
 	}
 
 	return RDSInfos, nil
+}
+
+func getRawMaxConnections(parameterGroupName *string) (string, error) {
+	var ParameterInfos []*rds.DescribeDBParametersOutput
+	var rawMaxConenctions string
+
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	svc := rds.New(sess)
+	input := &rds.DescribeDBParametersInput{
+		DBParameterGroupName: parameterGroupName,
+	}
+
+	for {
+		result, err := svc.DescribeDBParameters(input)
+		if err != nil {
+			return "", fmt.Errorf("failed to describe DB instances: %w", err)
+		}
+
+		ParameterInfos = append(ParameterInfos, result)
+
+		// pagination
+		if result.Marker == nil {
+			break
+		}
+		input.SetMarker(*result.Marker)
+	}
+
+	for _, ParameterInfo := range ParameterInfos {
+		for _, Parameter := range ParameterInfo.Parameters {
+			if *Parameter.ParameterName == "max_connections" {
+				rawMaxConenctions = *Parameter.ParameterValue
+			}
+		}
+	}
+
+	return rawMaxConenctions, nil
 }
