@@ -1,0 +1,118 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+type RDSInfo struct {
+	DBInstanceIdentifier string
+	DBParameterGroups []*rds.DBParameterGroupStatus
+	DBInstanceClass string
+}
+
+var (
+	//nolint:gochecknoglobals
+	maxcon = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "aws_custom",
+		Subsystem: "rds",
+		Name:      "max_connections",
+		Help:      "MAx Connections of RDS",
+	},
+		[]string{"instance_identifier", "instance_class","max_connections"},
+	)
+)
+
+func main() {
+	interval, err := getInterval()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	prometheus.MustRegister(maxcon)
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(interval) * time.Second)
+
+		// register metrics as background
+		for range ticker.C {
+			err := snapshot()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}()
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func snapshot() error {
+	maxcon.Reset()
+
+	InstanceInfos, err := getRDSInstances()
+	if err != nil {
+		return fmt.Errorf("failed to read RDS Instance infos: %w", err)
+	}
+
+	for _, InstanceInfo := range InstanceInfos {
+		labels := prometheus.Labels{
+			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
+		//	"cluster_identifier":             InstanceInfo.DBParameterGroups,
+			"instance_class":     InstanceInfo.DBInstanceClass,
+		  "max_connections": "3000",
+		}
+		maxcon.With(labels).Set(1)
+	}
+
+	return nil
+}
+
+func getInterval() (int, error) {
+	const defaultGithubAPIIntervalSecond = 300
+	githubAPIInterval := os.Getenv("AWS_API_INTERVAL")
+	if len(githubAPIInterval) == 0 {
+		return defaultGithubAPIIntervalSecond, nil
+	}
+
+	integerGithubAPIInterval, err := strconv.Atoi(githubAPIInterval)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read Datadog Config: %w", err)
+	}
+
+	return integerGithubAPIInterval, nil
+}
+
+func getRDSInstances() ([]RDSInfo, error) {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	svc := rds.New(sess)
+	input := &rds.DescribeDBInstancesInput{}
+
+	RDSInstances, err := svc.DescribeDBInstances(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe DB instances: %w", err)
+	}
+	
+	RDSInfos := make([]RDSInfo, len(RDSInstances.DBInstances))
+	for i, RDSInstance := range RDSInstances.DBInstances {
+		RDSInfos[i] = RDSInfo{
+			DBInstanceIdentifier:  *RDSInstance.DBInstanceIdentifier,
+			DBParameterGroups:  RDSInstance.DBParameterGroups,
+			DBInstanceClass:  *RDSInstance.DBInstanceClass,
+		}
+	}
+
+	return RDSInfos, nil
+}
