@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 
 type RDSInfo struct {
 	DBInstanceIdentifier string
-	DBParameterGroups    []*rds.DBParameterGroupStatus
 	DBInstanceClass      string
 	MaxConnections       string
 }
@@ -27,7 +27,7 @@ var (
 		Namespace: "aws_custom",
 		Subsystem: "rds",
 		Name:      "max_connections",
-		Help:      "MAx Connections of RDS",
+		Help:      "Max Connections of RDS",
 	},
 		[]string{"instance_identifier", "instance_class", "max_connections"},
 	)
@@ -64,11 +64,16 @@ func snapshot() error {
 	if err != nil {
 		return fmt.Errorf("failed to read RDS Instance infos: %w", err)
 	}
+log.Printf("%v\n",InstanceInfos)
 
 	for _, InstanceInfo := range InstanceInfos {
+		if  InstanceInfo.MaxConnections == "0"{
+			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v",InstanceInfo.DBInstanceIdentifier,InstanceInfo.DBInstanceClass)
+			break
+		}
+
 		labels := prometheus.Labels{
 			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
-			//	"cluster_identifier":             InstanceInfo.DBParameterGroups,
 			"instance_class":  InstanceInfo.DBInstanceClass,
 			"max_connections": InstanceInfo.MaxConnections,
 		}
@@ -118,15 +123,69 @@ func getRDSInstances() ([]RDSInfo, error) {
 			}
 		}
 
+		maxConnections, err := getMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
+		if err != nil {
+			log.Printf("skip: failed to get max connections: %w", err)
+			// break
+		}
+
 		RDSInfos[i] = RDSInfo{
 			DBInstanceIdentifier: *RDSInstance.DBInstanceIdentifier,
-			DBParameterGroups:    RDSInstance.DBParameterGroups,
 			DBInstanceClass:      *RDSInstance.DBInstanceClass,
-			MaxConnections:       rawMaxConnections,
+			MaxConnections:       strconv.Itoa(maxConnections),
 		}
 	}
 
 	return RDSInfos, nil
+}
+
+// Parse rawMaxConnections and calculate with instance class.
+//
+// Example of raw values:
+// Aurora PostgreSQL: "LEAST({DBInstanceClassMemory/9531392},5000)"
+// Aurora MySQL: "GREATEST({log(DBInstanceClassMemory/805306368)*45},{log(DBInstanceClassMemory/8187281408)*1000})"
+func getMaxConnections(rawMaxConnections string, instanceClass *string) (int, error) {
+	defaultRep := regexp.MustCompile(`(LEAST)\({(DBInstanceClassMemory)/(\d+)},(\d+)\)`)
+	setRep := regexp.MustCompile(`(\d+)`)
+
+	if defaultRep.MatchString(rawMaxConnections) {
+		ret, err := getDefaultMaxConnections(*instanceClass)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get default max connections: %w", err)
+		}
+		return ret, nil
+	} else if setRep.MatchString(rawMaxConnections) {
+		v := setRep.FindAllStringSubmatch(rawMaxConnections, -1)
+		ret, _ := strconv.Atoi(v[0][0])
+		return ret, nil
+	}
+
+	return 0, nil
+}
+
+func getDefaultMaxConnections(instanceClass string) (int, error) {
+	auroraPostgresMaxcon := map[string]int{
+		"db.r4.large":    1600,
+		"db.r4.xlarge":   3200,
+		"db.r4.2xlarge":  5000,
+		"db.r4.4xlarge":  5000,
+		"db.r4.8xlarge":  5000,
+		"db.r4.16xlarge": 5000,
+		"db.r5.large":    1600,
+		"db.r5.xlarge":   3300,
+		"db.r5.2xlarge":  5000,
+		"db.r5.4xlarge":  5000,
+		"db.r5.12xlarge": 5000,
+		"db.r5.24xlarge": 5000,
+		"db.t3.medium":   420,
+	}
+
+	ret := auroraPostgresMaxcon[instanceClass]
+	if ret == 0 {
+		return 0, fmt.Errorf("instance class %v is not supported", instanceClass)
+	}
+
+	return ret, nil
 }
 
 func getRawMaxConnections(parameterGroupName *string) (string, error) {
