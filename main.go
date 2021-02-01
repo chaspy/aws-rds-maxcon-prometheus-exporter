@@ -64,18 +64,18 @@ func snapshot() error {
 	if err != nil {
 		return fmt.Errorf("failed to read RDS Instance infos: %w", err)
 	}
-log.Printf("%v\n",InstanceInfos)
+	log.Printf("%v\n", InstanceInfos)
 
 	for _, InstanceInfo := range InstanceInfos {
-		if  InstanceInfo.MaxConnections == "0"{
-			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v",InstanceInfo.DBInstanceIdentifier,InstanceInfo.DBInstanceClass)
+		if InstanceInfo.MaxConnections == "0" {
+			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
 			break
 		}
 
 		labels := prometheus.Labels{
 			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
-			"instance_class":  InstanceInfo.DBInstanceClass,
-			"max_connections": InstanceInfo.MaxConnections,
+			"instance_class":      InstanceInfo.DBInstanceClass,
+			"max_connections":     InstanceInfo.MaxConnections,
 		}
 		maxcon.With(labels).Set(1)
 	}
@@ -125,7 +125,7 @@ func getRDSInstances() ([]RDSInfo, error) {
 
 		maxConnections, err := getMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
 		if err != nil {
-			log.Printf("skip: failed to get max connections: %w", err)
+			log.Printf("skip: failed to get max connections: %v", err)
 			// break
 		}
 
