@@ -13,12 +13,12 @@ import (
 // Aurora MySQL: "GREATEST({log(DBInstanceClassMemory/805306368)*45},{log(DBInstanceClassMemory/8187281408)*1000})"
 // RDS Postgres: Same with Aurora PostgreSQL
 // RDS MySQL: {DBInstanceClassMemory/12582880}
-func getPostgresMaxConnections(rawMaxConnections string, instanceClass *string) (int, error) {
+func GetPostgresMaxConnections(rawMaxConnections string, instanceClass *string) (int, error) {
 	defaultRep := regexp.MustCompile(`(LEAST)\({(DBInstanceClassMemory)/(\d+)},(\d+)\)`)
 	setRep := regexp.MustCompile(`(\d+)`)
 
 	if defaultRep.MatchString(rawMaxConnections) {
-		ret, err := getDefaultPostgresMaxConnections(*instanceClass)
+		ret, err := GetDefaultPostgresMaxConnections(*instanceClass)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get default max connections: %w", err)
 		}
@@ -40,7 +40,7 @@ func getPostgresMaxConnections(rawMaxConnections string, instanceClass *string) 
 // In other words, for instances with a memory size larger than 47.65696 GB,
 // max_connection is 5000.
 // ref: https://aws.amazon.com/rds/instance-types/
-func getDefaultPostgresMaxConnections(instanceClass string) (int, error) {
+func GetDefaultPostgresMaxConnections(instanceClass string) (int, error) {
 	auroraPostgresMaxcon := map[string]int{
 		"db.r4.large":    1600, // Memory  15.25 GB
 		"db.r4.xlarge":   3200, // Memory  30.5  GB

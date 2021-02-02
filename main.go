@@ -130,7 +130,7 @@ func getRDSInstances() ([]RDSInfo, error) {
 		}
 
 		if *RDSInstance.Engine == "aurora-postgresql" || *RDSInstance.Engine == "postgres" {
-			maxConnections, err = postgresql.getPostgresMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
+			maxConnections, err = postgresql.GetPostgresMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
 			if err != nil {
 				log.Printf("skip: failed to get max connections: %v", err)
 				// break
