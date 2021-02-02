@@ -19,6 +19,7 @@ type RDSInfo struct {
 	DBInstanceIdentifier string
 	DBInstanceClass      string
 	MaxConnections       string
+	DBEngine             string
 }
 
 var (
@@ -114,25 +115,34 @@ func getRDSInstances() ([]RDSInfo, error) {
 	}
 
 	RDSInfos := make([]RDSInfo, len(RDSInstances.DBInstances))
+	var maxConnections int
 
+	log.Printf("Number of DBInstances: %v", len(RDSInstances.DBInstances))
 	for i, RDSInstance := range RDSInstances.DBInstances {
+		log.Printf("DBInstanceIdentifier: %v Number of parameter group: %v", RDSInstance.DBInstanceIdentifier, len(RDSInstance.DBParameterGroups))
 		for _, DBParameterGroup := range RDSInstance.DBParameterGroups {
+			log.Printf("Instance %v parameterGroup %v\n", *RDSInstance.DBInstanceIdentifier, DBParameterGroup)
 			rawMaxConnections, err = getRawMaxConnections(DBParameterGroup.DBParameterGroupName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get Parameter Group: %w", err)
 			}
 		}
 
-		maxConnections, err := getMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
-		if err != nil {
-			log.Printf("skip: failed to get max connections: %v", err)
-			// break
+		if *RDSInstance.Engine == "aurora-postgresql" || *RDSInstance.Engine == "postgres" {
+			maxConnections, err = getPostgresMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
+			if err != nil {
+				log.Printf("skip: failed to get max connections: %v", err)
+				// break
+			}
+		} else {
+			log.Printf("skip: unsupported engine: %v, DBInstanceIdentifier: %v", *RDSInstance.Engine, *RDSInstance.DBInstanceIdentifier)
 		}
 
 		RDSInfos[i] = RDSInfo{
 			DBInstanceIdentifier: *RDSInstance.DBInstanceIdentifier,
 			DBInstanceClass:      *RDSInstance.DBInstanceClass,
 			MaxConnections:       strconv.Itoa(maxConnections),
+			DBEngine:             *RDSInstance.Engine,
 		}
 	}
 
@@ -144,12 +154,14 @@ func getRDSInstances() ([]RDSInfo, error) {
 // Example of raw values:
 // Aurora PostgreSQL: "LEAST({DBInstanceClassMemory/9531392},5000)"
 // Aurora MySQL: "GREATEST({log(DBInstanceClassMemory/805306368)*45},{log(DBInstanceClassMemory/8187281408)*1000})"
-func getMaxConnections(rawMaxConnections string, instanceClass *string) (int, error) {
+// RDS Postgres: Same with Aurora PostgreSQL
+// RDS MySQL: {DBInstanceClassMemory/12582880}
+func getPostgresMaxConnections(rawMaxConnections string, instanceClass *string) (int, error) {
 	defaultRep := regexp.MustCompile(`(LEAST)\({(DBInstanceClassMemory)/(\d+)},(\d+)\)`)
 	setRep := regexp.MustCompile(`(\d+)`)
 
 	if defaultRep.MatchString(rawMaxConnections) {
-		ret, err := getDefaultMaxConnections(*instanceClass)
+		ret, err := getDefaultPostgresMaxConnections(*instanceClass)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get default max connections: %w", err)
 		}
@@ -171,7 +183,7 @@ func getMaxConnections(rawMaxConnections string, instanceClass *string) (int, er
 // In other words, for instances with a memory size larger than 47.65696 GB,
 // max_connection is 5000.
 // ref: https://aws.amazon.com/rds/instance-types/
-func getDefaultMaxConnections(instanceClass string) (int, error) {
+func getDefaultPostgresMaxConnections(instanceClass string) (int, error) {
 	auroraPostgresMaxcon := map[string]int{
 		"db.r4.large":    1600, // Memory  15.25 GB
 		"db.r4.xlarge":   3200, // Memory  30.5  GB
