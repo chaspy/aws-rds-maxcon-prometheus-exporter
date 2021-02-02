@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	postgresql "github.com/chaspy/aws-rds-maxcon-prometheus-exporter/pkg/postgresql"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/prometheus/client_golang/prometheus"
