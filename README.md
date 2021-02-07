@@ -42,7 +42,7 @@ The following policy must be attached to the AWS role to be executed.
             "Effect": "Allow",
             "Action": [
                 "rds:DescribeDBInstances",
-                "rds:DescribeDBClusters"
+                "rds:DescribeDBParameters",
             ],
             "Resource": "*"
         }
