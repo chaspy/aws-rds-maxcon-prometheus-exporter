@@ -23,6 +23,10 @@ $ docker run chaspy/aws-rds-maxcon-prometheus-exporter:v0.1.0
 
 ```
 $ curl -s localhost:8080/metrics | grep aws_custom_rds_max_connections
+aws_custom_rds_max_connections{instance_class="db.r5.4xlarge",instance_identifier="postgres-api-production-a01",max_connections="5000"} 1
+aws_custom_rds_max_connections{instance_class="db.r5.4xlarge",instance_identifier="postgres-api-production-a02",max_connections="5000"} 1
+aws_custom_rds_max_connections{instance_class="db.r5.large",instance_identifier="test-postgres-production-a01",max_connections="1800"} 1
+aws_custom_rds_max_connections{instance_class="db.r5.large",instance_identifier="test-postgres-production-a02",max_connections="1800"} 1
 ```
 
 ## IAM Role
