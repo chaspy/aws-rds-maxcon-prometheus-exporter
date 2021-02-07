@@ -66,11 +66,10 @@ func snapshot() error {
 	if err != nil {
 		return fmt.Errorf("failed to read RDS Instance infos: %w", err)
 	}
-	log.Printf("%v\n", InstanceInfos)
 
 	for _, InstanceInfo := range InstanceInfos {
 		if InstanceInfo.MaxConnections == "0" {
-			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
+			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v\n", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
 			break
 		}
 
@@ -118,11 +117,8 @@ func getRDSInstances() ([]RDSInfo, error) {
 	RDSInfos := make([]RDSInfo, len(RDSInstances.DBInstances))
 	var maxConnections int
 
-	log.Printf("Number of DBInstances: %v", len(RDSInstances.DBInstances))
 	for i, RDSInstance := range RDSInstances.DBInstances {
-		log.Printf("DBInstanceIdentifier: %v Number of parameter group: %v", RDSInstance.DBInstanceIdentifier, len(RDSInstance.DBParameterGroups))
 		for _, DBParameterGroup := range RDSInstance.DBParameterGroups {
-			log.Printf("Instance %v parameterGroup %v\n", *RDSInstance.DBInstanceIdentifier, DBParameterGroup)
 			rawMaxConnections, err = getRawMaxConnections(DBParameterGroup.DBParameterGroupName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get Parameter Group: %w", err)
@@ -133,7 +129,6 @@ func getRDSInstances() ([]RDSInfo, error) {
 			maxConnections, err = postgresql.GetPostgresMaxConnections(rawMaxConnections, RDSInstance.DBInstanceClass)
 			if err != nil {
 				log.Printf("skip: failed to get max connections: %v", err)
-				// break
 			}
 		} else {
 			log.Printf("skip: unsupported engine: %v, DBInstanceIdentifier: %v", *RDSInstance.Engine, *RDSInstance.DBInstanceIdentifier)
