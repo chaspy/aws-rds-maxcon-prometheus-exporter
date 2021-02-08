@@ -68,7 +68,7 @@ func snapshot() error {
 
 	for _, InstanceInfo := range InstanceInfos {
 		if InstanceInfo.MaxConnections == "0" {
-			log.Printf("skip: max connection is 0. instance_identifier: %v, dbinstanceclass: %v\n", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
+			log.Printf("skip: max connection is 0. dbinstanceidentifier: %v, dbinstanceclass: %v\n", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
 			break
 		}
 
