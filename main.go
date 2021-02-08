@@ -30,7 +30,7 @@ var (
 		Name:      "max_connections",
 		Help:      "Max Connections of RDS",
 	},
-		[]string{"instance_identifier", "instance_class", "max_connections"},
+		[]string{"instance_identifier", "instance_class"},
 	)
 )
 
@@ -75,9 +75,13 @@ func snapshot() error {
 		labels := prometheus.Labels{
 			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
 			"instance_class":      InstanceInfo.DBInstanceClass,
-			"max_connections":     InstanceInfo.MaxConnections,
 		}
-		maxcon.With(labels).Set(1)
+		v, err := strconv.ParseFloat(InstanceInfo.MaxConnections, 64)
+		if err != nil {
+			return fmt.Errorf("failed to parse max connections to float64: %w", err)
+		}
+
+		maxcon.With(labels).Set(v)
 	}
 
 	return nil
