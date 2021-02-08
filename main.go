@@ -30,7 +30,7 @@ var (
 		Name:      "max_connections",
 		Help:      "Max Connections of RDS",
 	},
-		[]string{"dbinstanceidentifier", "instance_class"},
+		[]string{"dbinstanceidentifier", "dbinstanceclass"},
 	)
 )
 
@@ -68,13 +68,13 @@ func snapshot() error {
 
 	for _, InstanceInfo := range InstanceInfos {
 		if InstanceInfo.MaxConnections == "0" {
-			log.Printf("skip: max connection is 0. instance_identifier: %v, instance_class: %v\n", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
+			log.Printf("skip: max connection is 0. instance_identifier: %v, dbinstanceclass: %v\n", InstanceInfo.DBInstanceIdentifier, InstanceInfo.DBInstanceClass)
 			break
 		}
 
 		labels := prometheus.Labels{
 			"dbinstanceidentifier": InstanceInfo.DBInstanceIdentifier,
-			"instance_class":       InstanceInfo.DBInstanceClass,
+			"dbinstanceclass":      InstanceInfo.DBInstanceClass,
 		}
 		v, err := strconv.ParseFloat(InstanceInfo.MaxConnections, 64)
 		if err != nil {
