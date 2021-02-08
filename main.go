@@ -30,7 +30,7 @@ var (
 		Name:      "max_connections",
 		Help:      "Max Connections of RDS",
 	},
-		[]string{"instance_identifier", "instance_class"},
+		[]string{"dbinstanceidentifier", "instance_class"},
 	)
 )
 
@@ -73,8 +73,8 @@ func snapshot() error {
 		}
 
 		labels := prometheus.Labels{
-			"instance_identifier": InstanceInfo.DBInstanceIdentifier,
-			"instance_class":      InstanceInfo.DBInstanceClass,
+			"dbinstanceidentifier": InstanceInfo.DBInstanceIdentifier,
+			"instance_class":       InstanceInfo.DBInstanceClass,
 		}
 		v, err := strconv.ParseFloat(InstanceInfo.MaxConnections, 64)
 		if err != nil {
