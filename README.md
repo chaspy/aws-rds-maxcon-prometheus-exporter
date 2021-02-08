@@ -1,6 +1,8 @@
 # aws-rds-maxcon-prometheus-exporter
 Prometheus Exporter for AWS RDS Max Connections
 
+![image.png](image.png)
+
 ## How to run
 
 ### Local
