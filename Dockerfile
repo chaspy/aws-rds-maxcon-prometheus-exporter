@@ -14,7 +14,7 @@ RUN go build \
     -o /go/bin/aws-rds-maxcon-prometheus-exporter \
     -ldflags '-s -w'
 
-FROM alpine:3.13.0 as runner
+FROM alpine:3.13.5 as runner
 
 COPY --from=builder /go/bin/aws-rds-maxcon-prometheus-exporter /app/aws-rds-maxcon-prometheus-exporter
 
