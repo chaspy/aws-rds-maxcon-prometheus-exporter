@@ -1,4 +1,4 @@
-FROM golang:1.15.7 as builder
+FROM golang:1.15.7 AS builder
 
 WORKDIR /go/src
 
@@ -14,7 +14,7 @@ RUN go build \
     -o /go/bin/aws-rds-maxcon-prometheus-exporter \
     -ldflags '-s -w'
 
-FROM alpine:3.18.2 as runner
+FROM alpine:3.18.2 AS runner
 
 COPY --from=builder /go/bin/aws-rds-maxcon-prometheus-exporter /app/aws-rds-maxcon-prometheus-exporter
 
